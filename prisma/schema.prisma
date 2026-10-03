@@ -1,0 +1,219 @@
+// UrbanParcel AI - Prisma Schema
+// SIH26012: AI-Based Automated Urban Parcel Mapping and Cadastral Feature Extraction System using Drone Imagery
+// Ministry of Rural Development - Department of Land Resources (DoLR)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SURVEYOR
+  NODAL_OFFICER
+  GIS_ANALYST
+  ADMIN
+}
+
+enum AnalysisStatus {
+  PENDING
+  UPLOADING
+  PREPROCESSING
+  DETECTING_FEATURES
+  EXTRACTING_BOUNDARIES
+  GENERATING_MAP
+  COMPLETED
+  FAILED
+}
+
+enum LandUseType {
+  RESIDENTIAL
+  MIXED_RESIDENTIAL
+  COMMERCIAL
+  INSTITUTIONAL
+  INDUSTRIAL
+  OPEN_RECREATIONAL
+  AGRICULTURAL_FRINGE
+  TRANSPORTATION
+  WATER_BODY
+}
+
+enum BoundaryStatus {
+  VALID
+  NEEDS_REVIEW
+  DISPUTED
+  ENCROACHMENT_FLAGGED
+}
+
+enum FeatureType {
+  PARCEL_BOUNDARY
+  BUILDING_FOOTPRINT
+  ROAD
+  OPEN_AREA
+  VEGETATION
+  WATER_BODY
+  POSSIBLE_ENCROACHMENT
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  role         Role         @default(SURVEYOR)
+  department   String       @default("Department of Land Resources")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  droneImages  DroneImage[]
+  analyses     Analysis[]
+  reports      Report[]
+}
+
+model DroneImage {
+  id           String       @id @default(cuid())
+  fileName     String
+  fileSize     Int          // bytes
+  resolutionGsd Float       // Ground Sampling Distance in cm/pixel (e.g. 2.5)
+  flightAltitude Float      // meters AGL
+  flightDate   DateTime     @default(now())
+  locationName String
+  minLat       Float
+  maxLat       Float
+  minLng       Float
+  maxLng       Float
+  imageUrl     String
+  uploadedById String?
+  uploadedBy   User?        @relation(fields: [uploadedById], references: [id])
+  analyses     Analysis[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Analysis {
+  id               String          @id @default(cuid())
+  droneImageId     String
+  droneImage       DroneImage      @relation(fields: [droneImageId], references: [id], onDelete: Cascade)
+  status           AnalysisStatus  @default(PENDING)
+  modelName        String          @default("UrbanCadastre-Net v2.4 (Drone-GSD)")
+  overallConfidence Float          @default(0.92)
+  parcelsCount     Int             @default(0)
+  buildingsCount   Int             @default(0)
+  roadsCount       Int             @default(0)
+  featuresCount    Int             @default(0)
+  issuesCount      Int             @default(0)
+  aiSummary        String?
+  processedAt      DateTime?
+  createdById      String?
+  createdBy        User?           @relation(fields: [createdById], references: [id])
+  parcels          Parcel[]
+  features         CadastralFeature[]
+  validationResults ValidationResult[]
+  reports          Report[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model Parcel {
+  id             String            @id @default(cuid())
+  analysisId     String
+  analysis       Analysis          @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  parcelCode     String            @unique // e.g. UP-MH-00124
+  wardNo         String            @default("Ward-14")
+  areaSqM        Float             // Square meters
+  perimeterM     Float             // Perimeter in meters
+  landUse        LandUseType       @default(MIXED_RESIDENTIAL)
+  centroidLat    Float
+  centroidLng    Float
+  boundaryCoords Json              // GeoJSON polygon coordinates
+  buildingCount  Int               @default(1)
+  roadAccess     Boolean           @default(true)
+  confidence     Float             @default(0.94) // AI Model confidence
+  status         BoundaryStatus    @default(VALID)
+  notes          String?
+  buildings      Building[]
+  features       CadastralFeature[]
+  validation     ValidationResult?
+  reports        Report[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model CadastralFeature {
+  id          String      @id @default(cuid())
+  analysisId  String
+  analysis    Analysis    @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  parcelId    String?
+  parcel      Parcel?     @relation(fields: [parcelId], references: [id])
+  type        FeatureType
+  label       String
+  geometry    Json        // GeoJSON feature geometry
+  areaSqM     Float?
+  lengthM     Float?
+  confidence  Float       @default(0.90)
+  status      String      @default("Extracted")
+  attributes  Json?
+  createdAt   DateTime    @default(now())
+}
+
+model Building {
+  id          String   @id @default(cuid())
+  parcelId    String
+  parcel      Parcel   @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  structureId String   // e.g. BLD-00124-A
+  footprintSqM Float
+  stories     Int      @default(2)
+  roofType    String   @default("Concrete Slab")
+  confidence  Float    @default(0.95)
+  centroidLat Float
+  centroidLng Float
+  geometry    Json     // Polygon coordinates
+  createdAt   DateTime @default(now())
+}
+
+model Road {
+  id           String   @id @default(cuid())
+  name         String   @default("Access Lane")
+  roadWidthM   Float    @default(6.5)
+  surfaceType  String   @default("Asphalt")
+  lengthM      Float
+  geometry     Json     // Polyline coordinates
+  confidence   Float    @default(0.93)
+  createdAt    DateTime @default(now())
+}
+
+model ValidationResult {
+  id                   String   @id @default(cuid())
+  analysisId           String
+  analysis             Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  parcelId             String?  @unique
+  parcel               Parcel?  @relation(fields: [parcelId], references: [id])
+  closedBoundaries     Boolean  @default(true)
+  validCoordinates     Boolean  @default(true)
+  noDuplicateParcels   Boolean  @default(true)
+  overlapCount         Int      @default(0)
+  overlapDescription   String?
+  buildingInsideParcel Boolean  @default(true)
+  roadConnectivity     Boolean  @default(true)
+  selfIntersection     Boolean  @default(false)
+  hasWarnings          Boolean  @default(false)
+  surveyorNotes        String?
+  validatedAt          DateTime @default(now())
+}
+
+model Report {
+  id           String      @id @default(cuid())
+  reportNumber String      @unique // e.g. UPAR-2026-0041
+  analysisId   String
+  analysis     Analysis    @relation(fields: [analysisId], references: [id])
+  parcelId     String
+  parcel       Parcel      @relation(fields: [parcelId], references: [id])
+  generatedById String?
+  generatedBy  User?       @relation(fields: [generatedById], references: [id])
+  generatedAt  DateTime    @default(now())
+  status       String      @default("Generated")
+  summary      String
+  dataSnapshot Json
+  recommendations String?
+}

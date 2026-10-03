@@ -1,0 +1,6 @@
+{
+  "name": "UrbanParcel AI",
+  "description": "AI-Powered Urban Parcel Mapping and Cadastral Feature Extraction System using Drone Imagery for Smart India Hackathon 2026.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

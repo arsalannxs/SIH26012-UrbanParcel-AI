@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* Leaflet Container Overrides */
+.leaflet-container {
+  font-family: inherit;
+  width: 100%;
+  height: 100%;
+}
+
+.cadastral-tooltip {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #f8fafc !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+}
+
+.cadastral-tooltip::before {
+  border-top-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+/* Print Styles for Parcel Report */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  header,
+  footer,
+  nav,
+  button,
+  select,
+  .no-print {
+    display: none !important;
+  }
+
+  .printable-report {
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
